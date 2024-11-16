@@ -4,17 +4,31 @@ from .models import Program, Day, Exercise, Workout
 
 
 class WorkoutSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Workout
+        fields = ['id', 'date', 'rep', 'comment']
+
+
+class WorkoutCreateSerializer(serializers.ModelSerializer):
     exercise_id = serializers.IntegerField(write_only=True)
     date = serializers.DateField(required=False)
+
     class Meta:
         model = Workout
         fields = ['id', 'date', 'rep', 'comment', 'exercise_id']
 
+
+class WorkoutBulkSerializer(serializers.Serializer):
+    workouts = WorkoutCreateSerializer(many=True)
+
     def create(self, validated_data):
-        exercise_id = validated_data.pop('exercise_id')
-        exercise = Exercise.objects.get(pk=exercise_id)
-        workout = Workout.objects.create(exercise=exercise, **validated_data)
-        return workout
+        workouts_data = validated_data.get('workouts')
+        workouts_lst = []
+        for workout_data in workouts_data:
+            exercise_id = workout_data.pop('exercise_id')
+            workouts_lst.append(Workout(exercise_id=exercise_id, **workout_data))
+        Workout.objects.bulk_create(workouts_lst)
+        return WorkoutSerializer(workouts_lst, many=True).data
 
 
 class ExerciseSerializer(serializers.ModelSerializer):
@@ -53,3 +67,9 @@ class ProgramSerializer(serializers.ModelSerializer):
                     Workout.objects.create(exercise=exercise, **workout_data)
 
         return program
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        instance.save()
+        return instance
